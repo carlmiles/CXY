@@ -1,0 +1,35 @@
+# Lead-gen scraper config for Europages public directory search
+# Target industry: sheet metal fabrication / processing (钣金加工)
+
+site:
+  name: europages
+  base_url: "https://www.europages.co.uk"
+  # {keyword} and {page} are filled in at request time
+  search_url_template: "https://www.europages.co.uk/companies/{keyword}.html?catP={page}"
+  robots_txt_url: "https://www.europages.co.uk/robots.txt"
+
+# Search keywords (English works best on Europages regardless of buyer's home country)
+keywords:
+  - "sheet metal fabrication"
+  - "metal stamping"
+  - "laser cutting services"
+  - "sheet metal processing"
+  - "CNC sheet metal machining"
+  - "metal enclosures manufacturing"
+
+# Pages to fetch per keyword (Europages paginates ~20 results/page)
+max_pages_per_keyword: 5
+
+# Politeness settings
+request_delay_seconds: 3       # base delay between requests
+request_delay_jitter: 2        # + random 0..jitter seconds
+timeout_seconds: 20
+user_agent: "Mozilla/5.0 (compatible; LeadResearchBot/1.0; contact: your-email@example.com)"
+
+output:
+  path: "output/leads.xlsx"
+  dedupe_on: ["company_name", "country"]
+
+# Where raw HTML is dumped when the parser can't find any listings,
+# so selectors can be inspected/updated without re-running the crawl.
+debug_dump_dir: "output/debug_html"
