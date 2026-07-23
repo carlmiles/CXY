@@ -1,34 +1,49 @@
-# Lead-gen scraper config for Europages public directory search
-# Target industry: sheet metal fabrication / processing (钣金加工)
+# Buying-lead radar for Tradewheel's public "buyers" pages.
+#
+# Why this instead of a supplier directory: sites like Europages/ThomasNet
+# mostly list companies that DO sheet metal fabrication (your competitors).
+# Tradewheel's /buyers/ pages list companies that WANT to buy sheet metal
+# parts (real demand signals). Contact details on these pages are normally
+# gated behind a paid supplier account - this tool does not try to bypass
+# that. It only tracks which lead titles/summaries are publicly listed and
+# flags NEW ones since the last run, so you know when to log into the
+# platform and respond while the lead is fresh.
 
 site:
-  name: europages
-  base_url: "https://www.europages.co.uk"
-  # {keyword} and {page} are filled in at request time
-  search_url_template: "https://www.europages.co.uk/companies/{keyword}.html?catP={page}"
-  robots_txt_url: "https://www.europages.co.uk/robots.txt"
+  name: tradewheel
+  base_url: "https://www.tradewheel.com"
+  # {category} and {page} filled in at request time. Verify each slug with
+  # --selftest first - these are guesses based on one confirmed URL
+  # (https://www.tradewheel.com/buyers/sheet-metal-parts/).
+  search_url_template: "https://www.tradewheel.com/buyers/{category}/?page={page}"
+  robots_txt_url: "https://www.tradewheel.com/robots.txt"
 
-# Search keywords (English works best on Europages regardless of buyer's home country)
-keywords:
-  - "sheet metal fabrication"
-  - "metal stamping"
-  - "laser cutting services"
-  - "sheet metal processing"
-  - "CNC sheet metal machining"
-  - "metal enclosures manufacturing"
+categories:
+  - "sheet-metal-parts"
+  - "sheet-metal-fabrication"
+  - "metal-stamping-parts"
+  - "laser-cutting-parts"
+  - "sheet-metal-components"
 
-# Pages to fetch per keyword (Europages paginates ~20 results/page)
-max_pages_per_keyword: 5
+# Pages to check per category per run
+max_pages_per_category: 3
 
 # Politeness settings
-request_delay_seconds: 3       # base delay between requests
-request_delay_jitter: 2        # + random 0..jitter seconds
+request_delay_seconds: 3
+request_delay_jitter: 2
 timeout_seconds: 20
-user_agent: "Mozilla/5.0 (compatible; LeadResearchBot/1.0; contact: your-email@example.com)"
+user_agent: "Mozilla/5.0 (compatible; LeadRadarBot/1.0; contact: your-email@example.com)"
 
 output:
-  path: "output/leads.xlsx"
-  dedupe_on: ["company_name", "country"]
+  # Master log of every lead ever seen (grows over time)
+  path: "output/buying_leads.xlsx"
+  # New-since-last-run leads get written here too, so you can just check
+  # this one file after each run instead of re-scanning the master log.
+  new_leads_path: "output/new_leads.xlsx"
+  dedupe_on: ["source_url"]
+
+# Persisted between runs so re-running only flags genuinely new leads.
+seen_store_path: "output/seen_leads.json"
 
 # Where raw HTML is dumped when the parser can't find any listings,
 # so selectors can be inspected/updated without re-running the crawl.

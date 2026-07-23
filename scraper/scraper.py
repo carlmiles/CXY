@@ -1,58 +1,71 @@
 #!/usr/bin/env python3
-"""Lead-gen scraper for Europages public company-search pages.
+"""Buying-lead radar for Tradewheel's public /buyers/ category pages.
 
 Usage:
-    python scraper.py                # full crawl, writes output/leads.xlsx
-    python scraper.py --selftest      # fetch one page and report which
-                                       # selector strategy matched, without
-                                       # writing any output
+    python scraper.py                # full run, updates master log + new_leads file
+    python scraper.py --selftest      # fetch one page, report selector match, no output
 
 IMPORTANT: This script has NOT been tested against the live site from this
 machine (the dev sandbox that generated it has no outbound network access).
-Europages' markup changes over time, so run --selftest first. If it reports
-zero matches for every strategy, open output/debug_html/*.html in a browser,
-inspect a listing card's selector, and add it to CARD_SELECTOR_CANDIDATES
-below.
+Run --selftest first. If it reports zero matches for every strategy, open
+output/debug_html/*.html in a browser, inspect a lead card's actual selector,
+and add it to CARD_SELECTOR_CANDIDATES below.
 
-Also review europages.com's Terms of Service and robots.txt before running
-a full crawl - this script checks robots.txt and refuses disallowed paths,
-but that is not a substitute for reading the ToS yourself.
+What this does NOT do: buyer contact details on trade-lead marketplaces are
+normally gated behind a paid supplier account, and that's intentional - it's
+the platform's business model, not a bug to work around. This script only
+tracks publicly visible lead titles/summaries/dates and flags which ones are
+NEW since your last run, so you know when to log into Tradewheel yourself
+and respond to a fresh lead through their normal quote flow.
+
+Review Tradewheel's Terms of Service and robots.txt before running a full
+scan - the robots.txt check here is a basic courtesy check, not legal advice.
 """
 import argparse
-import csv
+import json
 import random
 import sys
 import time
 import urllib.robotparser
 from pathlib import Path
-from urllib.parse import quote
 
 import requests
 import yaml
 from bs4 import BeautifulSoup
 
-# Candidate CSS selectors for the element wrapping a single company listing.
-# Tried in order; the first one that matches >0 elements on a page is used
-# for that page. Add/replace entries here if --selftest reports 0 matches.
+# Candidate CSS selectors for the element wrapping a single buying lead.
+# Tried in order; the first one that matches >0 elements on a page is used.
+# Add/replace entries here if --selftest reports 0 matches.
 CARD_SELECTOR_CANDIDATES = [
-    "div[data-testid='company-card']",
-    "article.company-card",
-    "div.company-card",
-    "li.company-result",
-    "div.card-content",
+    "div[data-testid='lead-card']",
+    "div.lead-card",
+    "div.buying-lead",
+    "li.lead-item",
+    "div.post-item",
 ]
 
 FIELD_SELECTORS = {
-    "company_name": ["h2", "h3", "[data-testid='company-name']", "a.company-name"],
-    "country": ["[data-testid='company-country']", ".country", "span.country"],
-    "category": ["[data-testid='company-activity']", ".activity", ".category"],
-    "link": ["a"],
+    "lead_title": ["h2", "h3", "a.lead-title", "[data-testid='lead-title']"],
+    "country": ["[data-testid='lead-country']", ".country", "span.country"],
+    "posted_date": ["[data-testid='lead-date']", ".date", "time"],
 }
 
 
 def load_config(path: str) -> dict:
     with open(path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
+
+
+def load_seen_store(path: str) -> set:
+    p = Path(path)
+    if not p.exists():
+        return set()
+    return set(json.loads(p.read_text(encoding="utf-8")))
+
+
+def save_seen_store(path: str, seen: set) -> None:
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    Path(path).write_text(json.dumps(sorted(seen)), encoding="utf-8")
 
 
 def robots_allows(base_url: str, robots_txt_url: str, path: str, user_agent: str) -> bool:
@@ -77,6 +90,9 @@ def fetch(session: requests.Session, url: str, config: dict) -> str | None:
             continue
         if resp.status_code == 200:
             return resp.text
+        if resp.status_code == 404:
+            print(f"[warn] 404 at {url} - category slug is probably wrong", file=sys.stderr)
+            return None
         if resp.status_code in (429, 503):
             wait = 10 * (attempt + 1)
             print(f"[warn] got {resp.status_code}, backing off {wait}s", file=sys.stderr)
@@ -110,13 +126,13 @@ def parse_listings(html: str, base_url: str) -> tuple[list[dict], str | None]:
                 href = base_url + href
             rows.append(
                 {
-                    "company_name": _first_text(card, FIELD_SELECTORS["company_name"]),
+                    "lead_title": _first_text(card, FIELD_SELECTORS["lead_title"]),
                     "country": _first_text(card, FIELD_SELECTORS["country"]),
-                    "category": _first_text(card, FIELD_SELECTORS["category"]),
+                    "posted_date": _first_text(card, FIELD_SELECTORS["posted_date"]),
                     "source_url": href,
                 }
             )
-        rows = [r for r in rows if r["company_name"]]
+        rows = [r for r in rows if r["lead_title"]]
         if rows:
             return rows, selector
     return [], None
@@ -129,51 +145,28 @@ def dump_debug_html(html: str, dump_dir: str, tag: str) -> None:
     print(f"[debug] saved raw HTML to {out} for selector inspection", file=sys.stderr)
 
 
-def write_output(rows: list[dict], config: dict) -> None:
-    dedupe_keys = config["output"]["dedupe_on"]
-    seen = set()
-    unique_rows = []
+def write_xlsx(rows: list[dict], path: Path, columns: list[str]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "leads"
+    ws.append(columns)
     for row in rows:
-        key = tuple(row.get(k, "") for k in dedupe_keys)
-        if key in seen:
-            continue
-        seen.add(key)
-        unique_rows.append(row)
-
-    out_path = Path(config["output"]["path"])
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-
-    try:
-        from openpyxl import Workbook
-
-        wb = Workbook()
-        ws = wb.active
-        ws.title = "leads"
-        columns = ["company_name", "country", "category", "source_url", "search_keyword"]
-        ws.append(columns)
-        for row in unique_rows:
-            ws.append([row.get(c, "") for c in columns])
-        wb.save(out_path)
-        print(f"[ok] wrote {len(unique_rows)} unique leads to {out_path}")
-    except ImportError:
-        csv_path = out_path.with_suffix(".csv")
-        with open(csv_path, "w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=["company_name", "country", "category", "source_url", "search_keyword"])
-            writer.writeheader()
-            writer.writerows(unique_rows)
-        print(f"[ok] openpyxl not installed; wrote {len(unique_rows)} unique leads to {csv_path}")
+        ws.append([row.get(c, "") for c in columns])
+    wb.save(path)
 
 
 def crawl(config: dict, selftest: bool = False) -> list[dict]:
     session = requests.Session()
     all_rows: list[dict] = []
-    keywords = config["keywords"][:1] if selftest else config["keywords"]
-    max_pages = 1 if selftest else config["max_pages_per_keyword"]
+    categories = config["categories"][:1] if selftest else config["categories"]
+    max_pages = 1 if selftest else config["max_pages_per_category"]
 
-    for keyword in keywords:
-        slug = quote(keyword)
+    for category in categories:
         for page in range(1, max_pages + 1):
-            url = config["site"]["search_url_template"].format(keyword=slug, page=page)
+            url = config["site"]["search_url_template"].format(category=category, page=page)
             path = url.replace(config["site"]["base_url"], "")
             if not robots_allows(
                 config["site"]["base_url"], config["site"]["robots_txt_url"], path, config["user_agent"]
@@ -191,16 +184,16 @@ def crawl(config: dict, selftest: bool = False) -> list[dict]:
                 print(f"[selftest] selector candidates tried: {CARD_SELECTOR_CANDIDATES}")
                 print(f"[selftest] matched selector: {selector_used!r}, rows found: {len(rows)}")
                 if not rows:
-                    dump_debug_html(html, config["debug_dump_dir"], f"selftest_{keyword.replace(' ', '_')}")
+                    dump_debug_html(html, config["debug_dump_dir"], f"selftest_{category}")
                 return rows
 
             if not rows:
-                dump_debug_html(html, config["debug_dump_dir"], f"{keyword.replace(' ', '_')}_p{page}")
-                print(f"[warn] no listings parsed for '{keyword}' page {page}; stopping this keyword", file=sys.stderr)
+                dump_debug_html(html, config["debug_dump_dir"], f"{category}_p{page}")
+                print(f"[warn] no leads parsed for '{category}' page {page}; stopping this category", file=sys.stderr)
                 break
 
             for r in rows:
-                r["search_keyword"] = keyword
+                r["category"] = category
             all_rows.extend(rows)
 
             delay = config["request_delay_seconds"] + random.uniform(0, config["request_delay_jitter"])
@@ -225,7 +218,34 @@ def main() -> None:
         print("[error] no leads collected - check output/debug_html for the raw pages and update selectors", file=sys.stderr)
         sys.exit(1)
 
-    write_output(rows, config)
+    # Dedupe within this run's results
+    dedupe_keys = config["output"]["dedupe_on"]
+    seen_this_run = set()
+    unique_rows = []
+    for row in rows:
+        key = tuple(row.get(k, "") for k in dedupe_keys)
+        if key in seen_this_run:
+            continue
+        seen_this_run.add(key)
+        unique_rows.append(row)
+
+    # Compare against leads seen in previous runs
+    seen_store_path = config["seen_store_path"]
+    previously_seen = load_seen_store(seen_store_path)
+    new_rows = [r for r in unique_rows if r["source_url"] not in previously_seen]
+
+    columns = ["lead_title", "country", "posted_date", "category", "source_url"]
+    write_xlsx(unique_rows, Path(config["output"]["path"]), columns)
+    print(f"[ok] wrote {len(unique_rows)} total leads to {config['output']['path']}")
+
+    if new_rows:
+        write_xlsx(new_rows, Path(config["output"]["new_leads_path"]), columns)
+        print(f"[ok] {len(new_rows)} NEW leads since last run -> {config['output']['new_leads_path']}")
+    else:
+        print("[ok] no new leads since last run")
+
+    previously_seen.update(r["source_url"] for r in unique_rows)
+    save_seen_store(seen_store_path, previously_seen)
 
 
 if __name__ == "__main__":
