@@ -1,61 +1,41 @@
-# 优先行业清单 — 路线二（反向挖掘）查阅
+# 优先行业清单（分层） — 路线 B（反向挖掘）查阅
 
-真正的客户通常不是"钣金行业"公司，而是使用钣金产品的设备制造企业。不要局限在钣金/金属加工行业内搜索。以下按行业列出检索关键词，搜索时与国家名、当地语言、以及 `product-checklist.md` 里的产品词组合使用。
+真正的客户通常不是"钣金行业"公司，而是使用钣金产品的设备制造企业。不要局限在钣金/金属加工行业内搜索。搜索时把下面的行业词与国家名、当地语言（见 `countries.md`）、以及 `product-checklist.md` 里的产品词组合使用。
 
-## 电力与新能源
+## 第一优先级
 
-Energy Storage System / Battery Energy Storage / Solar Inverter / PCS (Power Conversion System) / UPS / Power Supply / EV Charger / Charging Station / Power Distribution Equipment / Electrical Equipment
+**电力与新能源**：Energy Storage / BESS / PCS / Solar Inverter / UPS / Power Supply / EV Charger / Charging Station / Power Distribution
 
-重点寻找：设备外壳、安装板、支架、底座、面板和箱体需求。
+**数据中心**：Liquid Cooling / CDU / PDU / UPS / Edge Data Center / Rack Equipment / Server Hardware
 
-## 工业自动化
+**工业自动化**：PLC Control / Motion Control / Industrial Robot / Automation Equipment / Machine Vision / Industrial Controller
 
-Industrial Automation / PLC Control / Motion Control / Machine Vision / Industrial Robot / Automation Equipment / Control System / Industrial Controller
+**通信与网络**：Industrial Router / Industrial IoT / Gateway / Telecom Equipment / Fiber Equipment / Network Appliance / Edge Computing
 
-## 通信与网络
+## 第二优先级
 
-Telecom Equipment / Network Equipment / Industrial Router / Industrial IoT / Gateway / Base Station Equipment / Fiber Equipment / Network Appliance / Edge Computing Equipment
+**电气控制**：Electrical Control / Switchgear
 
-## 数据中心
+**仪器仪表**：Test Equipment / Measurement Equipment / Laboratory Equipment
 
-Data Center Equipment / Server Hardware / Rack Equipment / Liquid Cooling / CDU / PDU / UPS / Cooling Equipment / Edge Data Center
+**医疗设备**：Medical Equipment
 
-## 电气控制
+**环保及水处理**：Water Treatment Equipment / Environmental Equipment
 
-Electrical Control Equipment / Control Cabinet / Distribution Equipment / Switchgear / Circuit Protection / Power Management / Electrical Panel
+**商用设备**：Smart Locker / Parcel Locker / Kiosk / Vending Machine
 
-## 仪器仪表
+**机械设备**：Packaging Equipment / Food Processing Equipment / Inspection Machine
 
-Test Equipment / Measurement Equipment / Laboratory Equipment / Industrial Instrument / Electronic Instrument / Analyzer
-
-## 医疗设备
-
-优先寻找：Medical Cart / Medical Equipment Housing / Laboratory Equipment / Diagnostic Equipment / Medical Device Enclosure
-
-## 商用设备
-
-Vending Machine / Kiosk / POS Equipment / Locker / Parcel Locker / Smart Cabinet / Commercial Equipment / Self-service Equipment
-
-## 环保及水处理
-
-Water Treatment Equipment / Pump Control / Environmental Monitoring / Filtration Equipment / Water Analysis Equipment
-
-## 机械设备
-
-CNC Accessories / Packaging Machine / Food Processing Equipment / Printing Equipment / Inspection Machine / Industrial Machinery
-
-## 搜索组合方式（以德国为例，其他国家同理替换国名+当地语言）
+## 搜索组合方式（示例，其他国家替换国名 + 追加当地语言）
 
 - `industrial automation equipment manufacturer Germany`
 - `energy storage equipment manufacturer Germany`
 - `electrical equipment manufacturer Germany`
-- `custom equipment manufacturer Germany`
 - `power electronics manufacturer Germany`
 - `EV charging equipment manufacturer Germany`
 - `industrial IoT manufacturer Germany`
 - `control system manufacturer Germany`
 - `metal enclosure sourcing Germany`
 - `sheet metal RFQ Germany`
-- `sheet metal fabrication supplier wanted Germany`
 
-进入该国后追加当地语言的同类关键词（见 `countries.md`），可以发现纯英文搜索找不到的当地中小企业。
+第一优先级行业应作为默认起点，第二优先级用于扩大覆盖或在第一优先级行业挖掘饱和后继续扩展。进入某国后追加当地语言的同类关键词（见 `countries.md`），可以发现纯英文搜索找不到的当地中小企业。
